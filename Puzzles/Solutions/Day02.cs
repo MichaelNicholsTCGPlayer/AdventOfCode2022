@@ -9,50 +9,44 @@ namespace Puzzles.Solutions
 
         public string Puzzle1(string[] input)
         {
-            var rounds = input.Select(r => Parse_1(r)).ToList();
+            var rounds = input.Select(r => Parse_RPS_RPS(r)).ToList();
 
             long totalScore = 0;
             foreach (var round in rounds)
             {
-                totalScore += Score_1(round);
+                totalScore += ScoreForRPS(round.yours);
+                totalScore += ScoreForLDW(CalculateLDW(round.theirs, round.yours));
             }
 
             return totalScore.ToString();
         }
 
-        private int Score_1((RPS theirs, RPS yours) round)
+        public string Puzzle2(string[] input)
         {
-            int score = 0;
-            switch (round.yours)
+            var rounds = input.Select(r => Parse_RPS_LDW(r)).ToList();
+
+            long totalScore = 0;
+            foreach (var round in rounds)
             {
-                case RPS.R:
-                    score += 1; // Rock: 1 point
-                    break;
-
-                case RPS.P:
-                    score += 2; // Paper: 2 points
-                    break;
-
-                case RPS.S:
-                    score += 3; // Scissors: 3 points
-                    break;
+                totalScore += ScoreForRPS(CalculateYourRPS(round.theirs, round.outcome));
+                totalScore += ScoreForLDW(round.outcome);
             }
 
-            // Loss: 0 points
-            // Draw: 3 points
-            // Win: 6 points
-            var roundResult = RoundResult_1(round.theirs, round.yours);
-            score += (int)roundResult * 3;
+            return totalScore.ToString();
 
-            return score;
         }
 
-        private (RPS theirs, RPS yours) Parse_1(string row)
+        private (RPS theirs, RPS yours) Parse_RPS_RPS(string row)
         {
-            return (Parse_1(row[0]), Parse_1(row[2]));
+            return (ParseRPS(row[0]), ParseRPS(row[2]));
         }
 
-        private RPS Parse_1(char c)
+        private (RPS theirs, LDW outcome) Parse_RPS_LDW(string row)
+        {
+            return (ParseRPS(row[0]), ParseLDW(row[2]));
+        }
+
+        private RPS ParseRPS(char c)
         {
             switch (c)
             {
@@ -73,61 +67,7 @@ namespace Puzzles.Solutions
             throw new Exception("Unknown Type");
         }
 
-        private LDW RoundResult_1(RPS theirs, RPS yours)
-        {
-            if (theirs == yours)
-            {
-                return LDW.D;
-            }
-
-            switch (theirs)
-            {
-                case RPS.R:
-                    if (yours == RPS.P)
-                        return LDW.W;
-                    else
-                        return LDW.L;
-
-                case RPS.P:
-                    if (yours == RPS.S)
-                        return LDW.W;
-                    else
-                        return LDW.L;
-
-                case RPS.S:
-                    if (yours == RPS.R)
-                        return LDW.W;
-                    else
-                        return LDW.L;
-            }
-
-            throw new Exception("Invalid Input");
-        }
-
-
-
-
-
-        public string Puzzle2(string[] input)
-        {
-            var rounds = input.Select(r => Parse_2(r)).ToList();
-
-            long totalScore = 0;
-            foreach (var round in rounds)
-            {
-                totalScore += Score_2(round);
-            }
-
-            return totalScore.ToString();
-
-        }
-
-        private (RPS theirs, LDW yours) Parse_2(string row)
-        {
-            return (Parse_1(row[0]), Parse_2(row[2]));
-        }
-
-        private LDW Parse_2(char c)
+        private LDW ParseLDW(char c)
         {
             switch (c)
             {
@@ -145,73 +85,110 @@ namespace Puzzles.Solutions
             throw new Exception("Unknown Type");
         }
 
-        private int Score_2((RPS theirs, LDW outcome) round)
+        private LDW CalculateLDW(RPS theirs, RPS yours)
         {
-            int score = 0;
-            RPS yours = RPS.P;
-
-            if (round.outcome == LDW.D)
+            if (theirs == yours)
             {
-                yours = round.theirs;
+                return LDW.D;
             }
-            else if (round.outcome == LDW.W)
+            else if (((int)theirs + 1) % 3 == (int)yours)
             {
-                switch (round.theirs)
-                {
-                    case RPS.R:
-                        yours = RPS.P;
-                        break;
-
-                    case RPS.P:
-                        yours = RPS.S;
-                        break;
-
-                    case RPS.S:
-                        yours = RPS.R;
-                        break;
-                }
+                return LDW.W;
             }
             else
             {
-                switch (round.theirs)
-                {
-                    case RPS.R:
-                        yours = RPS.S;
-                        break;
-
-                    case RPS.P:
-                        yours = RPS.R;
-                        break;
-
-                    case RPS.S:
-                        yours = RPS.P;
-                        break;
-                }
+                return LDW.L;
             }
 
-            switch (yours)
-            {
-                case RPS.R:
-                    score += 1; // Rock: 1 point
-                    break;
 
-                case RPS.P:
-                    score += 2; // Paper: 2 points
-                    break;
 
-                case RPS.S:
-                    score += 3; // Scissors: 3 points
-                    break;
-            }
+            // Brute Force Logic
+            //switch (theirs)
+            //{
+            //    case RPS.R:
+            //        if (yours == RPS.P)
+            //            return LDW.W;
+            //        else
+            //            return LDW.L;
 
+            //    case RPS.P:
+            //        if (yours == RPS.S)
+            //            return LDW.W;
+            //        else
+            //            return LDW.L;
+
+            //    case RPS.S:
+            //        if (yours == RPS.R)
+            //            return LDW.W;
+            //        else
+            //            return LDW.L;
+            //}
+
+            //throw new Exception("Invalid Input");
+        }
+
+        private RPS CalculateYourRPS(RPS theirs, LDW outcome)
+        {
+            return (RPS)(((int)theirs + (int)outcome + 2) % 3);
+
+            // Brute Force Logic
+            //RPS yours = RPS.P;
+
+            //if (round.outcome == LDW.D)
+            //{
+            //    yours = round.theirs;
+            //}
+            //else if (round.outcome == LDW.W)
+            //{
+            //    switch (round.theirs)
+            //    {
+            //        case RPS.R:
+            //            yours = RPS.P;
+            //            break;
+
+            //        case RPS.P:
+            //            yours = RPS.S;
+            //            break;
+
+            //        case RPS.S:
+            //            yours = RPS.R;
+            //            break;
+            //    }
+            //}
+            //else
+            //{
+            //    switch (round.theirs)
+            //    {
+            //        case RPS.R:
+            //            yours = RPS.S;
+            //            break;
+
+            //        case RPS.P:
+            //            yours = RPS.R;
+            //            break;
+
+            //        case RPS.S:
+            //            yours = RPS.P;
+            //            break;
+            //    }
+            //}
+        }
+
+        private int ScoreForLDW(LDW outcome)
+        {
             // Loss: 0 points
             // Draw: 3 points
             // Win: 6 points
-            score += (int)round.outcome * 3;
-
-            return score;
+            return (int)outcome * 3;
         }
 
+        private int ScoreForRPS(RPS yours)
+        {
+            // Rock: 1 point
+            // Paper: 2 points
+            // Scissors: 3 points
+            return (int)yours + 1;
+        }
 
         private enum RPS
         {
