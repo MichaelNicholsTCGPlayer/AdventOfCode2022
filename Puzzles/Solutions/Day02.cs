@@ -1,7 +1,4 @@
-﻿using System.IO.Pipes;
-using System.Reflection.Emit;
-
-namespace Puzzles.Solutions
+﻿namespace Puzzles.Solutions
 {
     public sealed class Day02 : IPuzzle
     {
