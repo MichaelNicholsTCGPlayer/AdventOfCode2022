@@ -1,6 +1,4 @@
-﻿using System.Net.Http.Headers;
-
-namespace Puzzles.Solutions
+﻿namespace Puzzles.Solutions
 {
     public sealed class Day09 : IPuzzle
     {
@@ -136,7 +134,6 @@ namespace Puzzles.Solutions
             return counter.Count().ToString();
         }
 
-
         private (int x, int y) Distance((int x, int y) head, (int x, int y) tail)
         {
             return (Math.Abs(head.x - tail.x), Math.Abs(head.y - tail.y));
@@ -210,6 +207,5 @@ namespace Puzzles.Solutions
 
             return positions;
         }
-
     }
 }

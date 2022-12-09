@@ -364,3 +364,7 @@ TestResults/
 
 # Mac exclusions
 .DS_Store
+
+# Per Eric (Dont check in input files)
+**/TestInput/**/*.txt
+**/Input/*.txt
