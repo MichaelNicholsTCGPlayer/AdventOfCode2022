@@ -8,47 +8,35 @@
         {
             var monkeys = ParseInput(input, 3);
 
-            var inspectCount = Enumerable.Range(0, monkeys.Count).ToDictionary(r => r, r => 0L);
-            for (int round = 0; round < 20; round++)
-            {
-                foreach (var monkey in monkeys)
-                {
-                    foreach (var item in monkey.Items.ToList())
-                    {
-                        // Increase the Inspection Counter for this monkey
-                        inspectCount[monkey.Number]++;
+            var inspectCount = GetInspectionCounts(monkeys, 20);
 
-                        var throwToMonkey = monkey.ProcessItem(item);
-                        if (monkeys[throwToMonkey].Number != throwToMonkey)
-                        {
-                            throw new Exception("Incorrect Order");
-                        }
-
-                        // Throw To Other Monkey
-                        monkey.Items.Remove(item);
-                        monkeys[throwToMonkey].Items.Add(item);
-                    }
-                }
-            }
-
-            // Take Two Monkeys with the most inspections and multiple that number together to get answer
-            var top2 = inspectCount.Values.OrderByDescending(r => r).Take(2).ToList();
-            return (top2[0] * top2[1]).ToString();
+            return GetFinalResult(inspectCount).ToString();
         }
 
         public string Puzzle2(string[] input)
         {
             var monkeys = ParseInput(input, 1);
 
-            // Determine a WorryMod by determining a Common Denominator across all the Tests
+            // Determine a WorryMod by determining a Common Multiple across all the Tests
             long worryMod = 1;
             foreach (var monkey in monkeys)
             {
                 worryMod *= monkey.TestMultiplier;
             }
+            foreach (var monkey in monkeys)
+            {
+                monkey.WorryMod = worryMod;
+            }
 
+            var inspectCount = GetInspectionCounts(monkeys, 10000);
+
+            return GetFinalResult(inspectCount).ToString();
+        }
+
+        private Dictionary<int, long> GetInspectionCounts(List<Monkey> monkeys, int rounds)
+        {
             var inspectCount = Enumerable.Range(0, monkeys.Count).ToDictionary(r => r, r => 0L);
-            for (int round = 0; round < 10000; round++)
+            for (int round = 0; round < rounds; round++)
             {
                 foreach (var monkey in monkeys)
                 {
@@ -58,10 +46,6 @@
                         inspectCount[monkey.Number]++;
 
                         var throwToMonkey = monkey.ProcessItem(item);
-                        if (monkeys[throwToMonkey].Number != throwToMonkey)
-                        {
-                            throw new Exception("Incorrect Order");
-                        }
 
                         // Throw To Other Monkey
                         monkey.Items.Remove(item);
@@ -69,22 +53,19 @@
                     }
                 }
 
-                // DEBUG BREAK POINTS
-                if (round == 0 || round == 19 || round == 999 || round == 1999 || round == 2999)
-                {
-
-                }
-
-                // Mod all of the Worry Levels to keep them within an acceptable range
-                foreach(var item in monkeys.SelectMany(r => r.Items))
-                {
-                    item.WorryLevel = item.WorryLevel % worryMod;
-                }
+                //// DEBUG BREAK POINTS
+                //if (round == 0 || round == 19 || round == 999 || round == 1999 || round == 2999)
+                //{
+                //}
             }
 
-            // Take Two Monkeys with the most inspections and multiple that number together to get answer
-            var top2 = inspectCount.Values.OrderByDescending(r => r).Take(2).ToList();
-            return (top2[0] * top2[1]).ToString();
+            return inspectCount;
+        }
+
+        private long GetFinalResult(Dictionary<int, long> inspectCounts)
+        {
+            var top2 = inspectCounts.Values.OrderByDescending(r => r).Take(2).ToList();
+            return top2[0] * top2[1];
         }
 
         private List<Monkey> ParseInput(string[] input, int reliefMultiplier)
@@ -182,6 +163,8 @@
 
             public long ReliefMultiplier { get; set; } = 1;
 
+            public long WorryMod { get; set; } = 0;
+
             public int ProcessItem(Item item)
             {
                 item.WorryLevel = InspectItem(item);
@@ -209,6 +192,11 @@
                 // your relief that the monkey's inspection didn't damage the item causes your
                 // worry level to be divided by <ReliefMultiplier> and rounded down to the nearest integer.
                 item.WorryLevel = item.WorryLevel / ReliefMultiplier;
+
+                if (WorryMod != 0)
+                {
+                    item.WorryLevel = item.WorryLevel % WorryMod;
+                }
             }
         }
 
