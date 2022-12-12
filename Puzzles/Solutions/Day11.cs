@@ -153,7 +153,7 @@
 
             public List<Item> Items { get; } = new List<Item>();
 
-            public Func<Item, long> InspectItem { get; set; }
+            public Func<Item, long> InspectItem { get; set; } = x => -1;
 
             public int TestMultiplier { get; set; }
 
