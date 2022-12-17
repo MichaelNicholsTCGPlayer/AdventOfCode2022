@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.ComponentModel;
+using System.Text;
 
 namespace Puzzles.Solutions
 {
@@ -13,15 +14,27 @@ namespace Puzzles.Solutions
 
         public string Puzzle2(string[] input)
         {
-            throw new NotImplementedException();
+            // This is WAY too big to brute force.
+            // IN THEORY: since the input cycles, there MUST be some point where a patter repeats.
+            //
+            // Once we locate the pattern we should be able to calculate the MaxHeight up to the very last cycle, which should
+            // dramatically recude the total cycles needed to calculation
+
+            return RunPuzzle(input, 1000000000000);
         }
 
 
         public string RunPuzzle(string[] input, long maxCycles)
         {
+            List<CycleVariables> cycleTracker = new List<CycleVariables>();
+            bool hitFloorOnCycle = false;
+            long previousCycleMaxHeight = -1;
+            bool jumpedAhead = false;
+
+
             // Load Instructions
             var instructions = input[0].Select(r => r == '<' ? -1 : 1).ToArray();
-            long currentInstruction = -1;
+            long currentInstructionIndex = -1;
 
             // State Variables
             long landedRockCount = 0;
@@ -34,8 +47,69 @@ namespace Puzzles.Solutions
             while (true)
             {
                 // Move to the next instruction
-                currentInstruction = (currentInstruction + 1) % instructions.Length;
-                var instruction = instructions[currentInstruction];
+                currentInstructionIndex = (currentInstructionIndex + 1) % instructions.Length;
+                var instruction = instructions[currentInstructionIndex];
+
+                if (currentInstructionIndex == 0 && !jumpedAhead)
+                {
+                    // Start of a new cycle, record the information to try and determine a pattern
+                    cycleTracker.Add(new CycleVariables()
+                    {
+                        LandedCount = landedRockCount,
+                        MaxHeight = maxHeight,
+                        MaxHeightIncreasedBy = maxHeight - previousCycleMaxHeight,
+                        RockType = currentRock.RockType,
+                        RockBottomComparedToMaxHeight = currentRock.Bottom - maxHeight,
+                        RockLeft = currentRock.Left,
+                        HitFloor = hitFloorOnCycle,
+                    });
+
+                    // Reset Per Cycle Vars
+                    hitFloorOnCycle = false;
+                    previousCycleMaxHeight = maxHeight;
+
+
+                    // Wait for a Good number before attempting to find a patter
+                    if (cycleTracker.Count > 500)
+                    {
+                        var cycleRepeat = FindCycle(cycleTracker);
+                        if (cycleRepeat != null)
+                        {
+                            // Adjust the variables to SKIP AHEAD!
+                            var simulateCycles = ((maxCycles - cycleRepeat.CycleStartIndex) / cycleRepeat.LandedRockChangeEveryCycle) - 5;
+
+                            var newLandedCount = cycleRepeat.LandedCountAtStart + (simulateCycles * cycleRepeat.LandedRockChangeEveryCycle);
+                            var newMaxHeight = cycleRepeat.MaxHeightAtStart + (simulateCycles * cycleRepeat.MaxHeightChangeEveryCycle);
+                            var newCurrentRockBottom = newMaxHeight + cycleRepeat.RockBottomComparedToMaxHeightAtEndOfCycle;
+
+                            // Fill The LandedRocks with 3 cycles work of data
+                            for (int i = 0; i < cycleRepeat.MaxHeightChangeEveryCycle * 3; i++)
+                            {
+                                var toIndex = newMaxHeight - i;
+                                var fromIndex = maxHeight - i;
+
+                                landedRocks[toIndex] = landedRocks[fromIndex];
+                            }
+
+                            if (currentRock.RockType != cycleRepeat.RockTypeAtEndOfCycle)
+                            {
+                                throw new Exception("Screwed Up The Repeat Cald");
+                            }
+
+                            if (currentRock.Left != cycleRepeat.RockLeftAtEndOfCycle)
+                            {
+                                throw new Exception("Screwed Up The Repeat Cald");
+                            }
+
+                            landedRockCount = newLandedCount;
+                            maxHeight = newMaxHeight;
+                            currentRock.Bottom = newCurrentRockBottom;
+
+                            jumpedAhead = true;
+                        }
+                    }
+                }
+
 
                 // Move Horizontal
                 var newLeft = currentRock.Left + instruction;
@@ -92,8 +166,9 @@ namespace Puzzles.Solutions
 
                     if (newBottom == -1)
                     {
-                        // Hit the Floow
+                        // Hit the Floor
                         verticalCollisionType = CollisionDetectType.CollisionBoth;
+                        hitFloorOnCycle = true;
                     }
                     else
                     {
@@ -606,6 +681,164 @@ namespace Puzzles.Solutions
                 return x.start.CompareTo(y.start);
             }
         }
+
+
+        public class CycleVariables
+        {
+            public long LandedCount { get; set; }
+
+            public long MaxHeight { get; set; }
+
+            public long MaxHeightIncreasedBy { get; set; }
+
+            public RockType RockType { get; set; }
+
+            public long RockBottomComparedToMaxHeight { get; set; }
+
+            public int RockLeft { get; set; }
+
+            public bool HitFloor { get; set; }
+
+            public override string ToString()
+            {
+                return $"L:{LandedCount}, MH: {MaxHeight}, MHD:{MaxHeightIncreasedBy}, R:{RockType}, RB: {RockBottomComparedToMaxHeight}, RL:{RockLeft}, HF:{HitFloor}";
+            }
+        }
+
+        private CycleRepeatData? FindCycle(List<CycleVariables> cycles)
+        {
+            // DEBUG
+            var fullLog = string.Join("\r\n", cycles.Select((r, i) => $"{i:0000}: {r}"));
+
+            var currentCheck = cycles[cycles.Count - 1];
+            for (int i = cycles.Count - 2; i >= 0; i--)
+            {
+                var compare = cycles[i];
+
+                if (compare.HitFloor)
+                {
+                    // If we hit the floor, it can't be a cycle
+                    break;
+                }
+
+                if (CheckIsCycleMatch(currentCheck, compare))
+                {
+                    var landedCountDiff = currentCheck.LandedCount - compare.LandedCount;
+                    var maxHeightDiff = currentCheck.MaxHeight - compare.MaxHeight;
+                    var possibleRepeat = (cycles.Count - 1) - i;
+
+                    bool verified = VerifyRepeatFrequency(cycles, possibleRepeat, cycles.Count - 1, landedCountDiff, maxHeightDiff, out var indexOfFailure);
+                    if (verified)
+                    {
+                        // We found a match, return the info
+                        return new CycleRepeatData()
+                        {
+                            CycleStartIndex = indexOfFailure,
+                            MaxHeightAtStart = cycles[indexOfFailure].MaxHeight,
+                            LandedCountAtStart = cycles[indexOfFailure].LandedCount,
+                            MaxHeightChangeEveryCycle = maxHeightDiff,
+                            LandedRockChangeEveryCycle = landedCountDiff,
+                            RockTypeAtEndOfCycle = currentCheck.RockType,
+                            RockBottomComparedToMaxHeightAtEndOfCycle = currentCheck.RockBottomComparedToMaxHeight,
+                            RockLeftAtEndOfCycle = currentCheck.RockLeft,
+                        };
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private bool VerifyRepeatFrequency(List<CycleVariables> cycles, int possibleRepeat, int startIndex, long landedCountDiff, long maxHeightDiff, out int indexOfFirstFailure)
+        {
+            indexOfFirstFailure = -1;
+            int successfulCycleCheck = 0;
+
+            while (true)
+            {
+                for (int i = 0; i < possibleRepeat; i++)
+                {
+                    if (startIndex - i - possibleRepeat < 0)
+                    {
+                        indexOfFirstFailure = startIndex;
+                        break;
+                    }
+
+                    var currentCheck = cycles[startIndex - i];
+                    var compare = cycles[startIndex - i - possibleRepeat];
+
+                    if (currentCheck.HitFloor || compare.HitFloor)
+                    {
+                        indexOfFirstFailure = startIndex;
+                        break;
+                    }
+
+                    if (!CheckIsCycleMatch(currentCheck, compare))
+                    {
+                        indexOfFirstFailure = startIndex;
+                        break;
+                    }
+                }
+
+                if (indexOfFirstFailure != -1)
+                {
+                    break;
+                }
+
+                // Compare the Diffs
+                var checkLandCountDiff = cycles[startIndex].LandedCount - cycles[startIndex - possibleRepeat].LandedCount;
+                if (checkLandCountDiff != landedCountDiff)
+                {
+                    indexOfFirstFailure = startIndex;
+                    break;
+                }
+
+                var checkMaxHeightDiff = cycles[startIndex].MaxHeight - cycles[startIndex - possibleRepeat].MaxHeight;
+                if (checkMaxHeightDiff != maxHeightDiff)
+                {
+                    indexOfFirstFailure = startIndex;
+                    break;
+                }
+
+                successfulCycleCheck++;
+                startIndex = startIndex - possibleRepeat;
+            }
+
+            return successfulCycleCheck > 10;  // We might need to make this bigger or smaller depending
+        }
+
+        private bool CheckIsCycleMatch(CycleVariables x, CycleVariables y)
+        {
+            return x.MaxHeightIncreasedBy == y.MaxHeightIncreasedBy &&
+                    x.RockBottomComparedToMaxHeight == y.RockBottomComparedToMaxHeight &&
+                    x.RockLeft == y.RockLeft &&
+                    x.RockType == y.RockType;
+        }
+
+
+
+
+
+        public class CycleRepeatData
+        {
+            public int CycleStartIndex { get; set; }
+
+            public long MaxHeightAtStart { get; set; }
+
+            public long LandedCountAtStart { get; set; }
+
+            public long MaxHeightChangeEveryCycle { get; set; }
+
+            public long LandedRockChangeEveryCycle { get; set; }
+
+            public RockType RockTypeAtEndOfCycle { get; set; }
+
+            public long RockBottomComparedToMaxHeightAtEndOfCycle { get; set; }
+
+            public int RockLeftAtEndOfCycle { get; set; }
+        }
+
+
 
     }
 }
