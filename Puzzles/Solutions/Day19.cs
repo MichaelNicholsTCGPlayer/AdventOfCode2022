@@ -11,7 +11,7 @@
             Dictionary<int, int> maxGeodes = new Dictionary<int, int>();
             foreach (var bluebrint in blueprints)
             {
-                maxGeodes[bluebrint.Blueprint.Id] = bluebrint.MaxGeodes();
+                maxGeodes[bluebrint.Blueprint.Id] = bluebrint.MaxGeodes(24);
                 bluebrint.ClearCache();
             }
 
@@ -20,7 +20,22 @@
 
         public string Puzzle2(string[] input)
         {
-            throw new NotImplementedException();
+            var blueprints = input.Take(3).Select(r => new State(new Blueprint(r))).ToList();
+
+            List<int> values = new List<int>();
+            foreach (var bluebrint in blueprints)
+            {
+                values.Add(bluebrint.MaxGeodes(32));
+                bluebrint.ClearCache();
+            }
+
+            int total = 1;
+            foreach (var value in values)
+            {
+                total *= value;
+            }
+
+            return total.ToString();
         }
 
         public class State
@@ -118,9 +133,9 @@
                 return canBuild;
             }
 
-            public int MaxGeodes()
+            public int MaxGeodes(int maxMinutes)
             {
-                return MaxGeodes((0, 0, 0, 0), (0, 0, 0, 1), 0, 24);
+                return MaxGeodes((0, 0, 0, 0), (0, 0, 0, 1), 0, maxMinutes);
             }
 
             Dictionary<((int, int, int, int), (int, int, int, int), int), int> cache = new();
@@ -136,157 +151,81 @@
             {
                 var maxSubTotal = 0;
 
-                if (cache.TryGetValue((collected, robots, minute), out var hit))
+                if (minute < maxTime)
                 {
-                    return hit;
-                }
-
-                var collectedStart = collected;
-                var robotStart = robots;
-
-
-                for (int i = minute; i < maxTime; i++)
-                {
-                    var canMakeGeodeRobot = CanBuildRobot(ResourceType.Geode, collected, out var postGeodeMod);
-                    var canMakeObsidianRobot = CanBuildRobot(ResourceType.Obsidian, collected, out var postObsidianMod);
-                    var canMakeClayRobot = CanBuildRobot(ResourceType.Clay, collected, out var postClayMod);
-                    var canMakeOreRobot = CanBuildRobot(ResourceType.Ore, collected, out var postOreMod);
-
-                    // Update Resource Counts
-                    collected.geode += robots.geode;
-                    collected.obsidian += robots.obsidian;
-                    collected.clay += robots.clay;
-                    collected.ore += robots.ore;
+                    bool triedMakingGeode = false;
+                    bool triedMakingObsidian = false;
+                    bool triedMakingClay = false;
+                    bool triedMakingOre = false;
 
 
-                    // Decide What To Build
-                    if (canMakeGeodeRobot)
+                    if (cache.TryGetValue((collected, robots, minute), out var hit))
                     {
-                        var newCollected = (collected.geode + postGeodeMod.geode, collected.obsidian + postGeodeMod.obsidian, collected.clay + postGeodeMod.clay, collected.ore + postGeodeMod.ore);
-                        var subTotal = MaxGeodes(newCollected, (robots.geode + 1, robots.obsidian, robots.clay, robots.ore), i + 1, maxTime);
-                        maxSubTotal = Math.Max(maxSubTotal, subTotal);
+                        return hit;
                     }
 
-                    if (canMakeObsidianRobot &&
-                        robots.obsidian < MaxNumberOfRobot.obsidian) // Do we have more than enough resources?
-                    {
-                        var newCollected = (collected.geode + postObsidianMod.geode, collected.obsidian + postObsidianMod.obsidian, collected.clay + postObsidianMod.clay, collected.ore + postObsidianMod.ore);
-                        var subTotal = MaxGeodes(newCollected, (robots.geode, robots.obsidian + 1, robots.clay, robots.ore), i + 1, maxTime);
-                        maxSubTotal = Math.Max(maxSubTotal, subTotal);
-                    }
+                    var collectedStart = collected;
+                    var robotStart = robots;
 
-                    if (canMakeClayRobot &&
-                        robots.clay < MaxNumberOfRobot.clay) // Do we have more than enough resources?
-                    {
-                        var newCollected = (collected.geode + postClayMod.geode, collected.obsidian + postClayMod.obsidian, collected.clay + postClayMod.clay, collected.ore + postClayMod.ore);
-                        var subTotal = MaxGeodes(newCollected, (robots.geode, robots.obsidian, robots.clay + 1, robots.ore), i + 1, maxTime);
-                        maxSubTotal = Math.Max(maxSubTotal, subTotal);
 
-                        if (i == 8)
+                    for (int i = minute; i < maxTime; i++)
+                    {
+                        var canMakeGeodeRobot = CanBuildRobot(ResourceType.Geode, collected, out var postGeodeMod);
+                        var canMakeObsidianRobot = CanBuildRobot(ResourceType.Obsidian, collected, out var postObsidianMod);
+                        var canMakeClayRobot = CanBuildRobot(ResourceType.Clay, collected, out var postClayMod);
+                        var canMakeOreRobot = CanBuildRobot(ResourceType.Ore, collected, out var postOreMod);
+
+                        // Update Resource Counts
+                        collected.geode += robots.geode;
+                        collected.obsidian += robots.obsidian;
+                        collected.clay += robots.clay;
+                        collected.ore += robots.ore;
+
+
+                        // Decide What To Build
+                        if (canMakeGeodeRobot && !triedMakingGeode)
                         {
+                            var newCollected = (collected.geode + postGeodeMod.geode, collected.obsidian + postGeodeMod.obsidian, collected.clay + postGeodeMod.clay, collected.ore + postGeodeMod.ore);
+                            var subTotal = MaxGeodes(newCollected, (robots.geode + 1, robots.obsidian, robots.clay, robots.ore), i + 1, maxTime);
+                            maxSubTotal = Math.Max(maxSubTotal, subTotal);
 
+                            triedMakingGeode = true;
                         }
+
+                        if (canMakeObsidianRobot && robots.obsidian < MaxNumberOfRobot.obsidian && !triedMakingObsidian)
+                        {
+                            var newCollected = (collected.geode + postObsidianMod.geode, collected.obsidian + postObsidianMod.obsidian, collected.clay + postObsidianMod.clay, collected.ore + postObsidianMod.ore);
+                            var subTotal = MaxGeodes(newCollected, (robots.geode, robots.obsidian + 1, robots.clay, robots.ore), i + 1, maxTime);
+                            maxSubTotal = Math.Max(maxSubTotal, subTotal);
+
+                            triedMakingObsidian = true;
+                        }
+
+                        if (canMakeClayRobot && robots.clay < MaxNumberOfRobot.clay && !triedMakingClay)
+                        {
+                            var newCollected = (collected.geode + postClayMod.geode, collected.obsidian + postClayMod.obsidian, collected.clay + postClayMod.clay, collected.ore + postClayMod.ore);
+                            var subTotal = MaxGeodes(newCollected, (robots.geode, robots.obsidian, robots.clay + 1, robots.ore), i + 1, maxTime);
+                            maxSubTotal = Math.Max(maxSubTotal, subTotal);
+
+                            triedMakingClay = true;
+                        }
+
+                        if (canMakeOreRobot && robots.ore < MaxNumberOfRobot.ore & !triedMakingOre)
+                        {
+                            var newCollected = (collected.geode + postOreMod.geode, collected.obsidian + postOreMod.obsidian, collected.clay + postOreMod.clay, collected.ore + postOreMod.ore);
+                            var subTotal = MaxGeodes(newCollected, (robots.geode, robots.obsidian, robots.clay, robots.ore + 1), i + 1, maxTime);
+                            maxSubTotal = Math.Max(maxSubTotal, subTotal);
+
+                            triedMakingOre = true;
+                        }
+
+                        maxSubTotal = Math.Max(maxSubTotal, collected.geode);
                     }
 
-                    if (canMakeOreRobot &&
-                        robots.ore < MaxNumberOfRobot.ore) // Do we have more than enough resources?
-                    {
-                        var newCollected = (collected.geode + postOreMod.geode, collected.obsidian + postOreMod.obsidian, collected.clay + postOreMod.clay, collected.ore + postOreMod.ore);
-                        var subTotal = MaxGeodes(newCollected, (robots.geode, robots.obsidian, robots.clay, robots.ore + 1), i + 1, maxTime);
-                        maxSubTotal = Math.Max(maxSubTotal, subTotal);
-                    }
-
-                    maxSubTotal = Math.Max(maxSubTotal, collected.geode);
+                    cache[(collectedStart, robotStart, minute)] = maxSubTotal;
                 }
-
-                cache[(collectedStart, robotStart, minute)] = maxSubTotal;
 
                 return maxSubTotal;
-            }
-
-
-            //public int MaxGeodes((int geode, int obsidian, int clay, int ore) collected, (int geode, int obsidian, int clay, int ore) robots, int minute, int maxTime)
-            //{
-            //    var maxSubTotal = 0;
-
-            //    if (cache.TryGetValue((collected, robots, minute), out var hit))
-            //    {
-            //        return hit;
-            //    }
-
-            //    var collectedStart = collected;
-            //    var robotStart = robots;
-
-
-            //    for (int i = minute; i < maxTime; i++)
-            //    {
-            //        var canMakeGeodeRobot = CanBuildRobot(ResourceType.Geode, collected, out var postGeodeMod);
-            //        var canMakeObsidianRobot = CanBuildRobot(ResourceType.Obsidian, collected, out var postObsidianMod);
-            //        var canMakeClayRobot = CanBuildRobot(ResourceType.Clay, collected, out var postClayMod);
-            //        var canMakeOreRobot = CanBuildRobot(ResourceType.Ore, collected, out var postOreMod);
-
-            //        // Update Resource Counts
-            //        collected.geode += robots.geode;
-            //        collected.obsidian += robots.obsidian;
-            //        collected.clay += robots.clay;
-            //        collected.ore += robots.ore;
-
-
-            //        // Decide What To Build
-            //        if (canMakeGeodeRobot)
-            //        {
-            //            var newCollected = (collected.geode + postGeodeMod.geode, collected.obsidian + postGeodeMod.obsidian, collected.clay + postGeodeMod.clay, collected.ore + postGeodeMod.ore);
-            //            var subTotal = MaxGeodes(newCollected, (robots.geode + 1, robots.obsidian, robots.clay, robots.ore), i + 1, maxTime);
-            //            maxSubTotal = Math.Max(maxSubTotal, subTotal);
-            //        }
-
-            //        if (canMakeObsidianRobot &&
-            //            robots.obsidian < MaxNumberOfRobot.obsidian &&  // Do we have all the robots we need?
-            //            NeedMoreResources(robots.obsidian, collected.obsidian, maxTime, i, MaxNumberOfRobot.obsidian)) // Do we have more than enough resources?
-            //        {
-            //            var newCollected = (collected.geode + postObsidianMod.geode, collected.obsidian + postObsidianMod.obsidian, collected.clay + postObsidianMod.clay, collected.ore + postObsidianMod.ore);
-            //            var subTotal = MaxGeodes(newCollected, (robots.geode, robots.obsidian + 1, robots.clay, robots.ore), i + 1, maxTime);
-            //            maxSubTotal = Math.Max(maxSubTotal, subTotal);
-            //        }
-
-            //        if (canMakeClayRobot &&
-            //            robots.clay < MaxNumberOfRobot.clay &&  // Do we have all the robots we need?
-            //            NeedMoreResources(robots.clay, collected.clay, maxTime, int.MaxValue, MaxNumberOfRobot.clay)) // Do we have more than enough resources?
-            //        {
-            //            var newCollected = (collected.geode + postClayMod.geode, collected.obsidian + postClayMod.obsidian, collected.clay + postClayMod.clay, collected.ore + postClayMod.ore);
-            //            var subTotal = MaxGeodes(newCollected, (robots.geode, robots.obsidian, robots.clay + 1, robots.ore), i + 1, maxTime);
-            //            maxSubTotal = Math.Max(maxSubTotal, subTotal);
-
-            //            if (i == 8)
-            //            {
-
-            //            }
-            //        }
-
-            //        if (canMakeOreRobot &&
-            //            robots.ore < MaxNumberOfRobot.ore &&  // Do we have all the robots we need?
-            //            NeedMoreResources(robots.ore, collected.ore, maxTime, i, MaxNumberOfRobot.ore)) // Do we have more than enough resources?
-            //        {
-            //            var newCollected = (collected.geode + postOreMod.geode, collected.obsidian + postOreMod.obsidian, collected.clay + postOreMod.clay, collected.ore + postOreMod.ore);
-            //            var subTotal = MaxGeodes(newCollected, (robots.geode, robots.obsidian, robots.clay, robots.ore + 1), i + 1, maxTime);
-            //            maxSubTotal = Math.Max(maxSubTotal, subTotal);
-            //        }
-
-            //        maxSubTotal = Math.Max(maxSubTotal, collected.geode);
-            //    }
-
-            //    cache[(collectedStart, robotStart, minute)] = maxSubTotal;
-
-            //    return maxSubTotal;
-            //}
-
-            // Not sure why this optimization didnt work
-            private bool NeedMoreResources(int robotCount, int collected, int max, int minutes, int maxRobotCount)
-            {
-                var endCount = collected + (robotCount * (max - minutes));
-                var endNeeded = (max - minutes) * maxRobotCount;
-
-                return endCount < endNeeded;
             }
         }
 
