@@ -12,8 +12,6 @@ namespace AdventOfCode2022
             //var input = File.ReadAllLines(fileName);
 
             //var x = puzzle.Puzzle1(input);
-
-
         }
     }
 }
