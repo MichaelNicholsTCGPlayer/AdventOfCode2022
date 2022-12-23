@@ -214,7 +214,7 @@ namespace Puzzles.Solutions
                     else
                     {
                         // x = r + y
-                        r = r + y.Value;
+                        r = r + y!.Value;
                     }
                     break;
 
@@ -227,7 +227,7 @@ namespace Puzzles.Solutions
                     else
                     {
                         // x = r * y
-                        r = r * y.Value;
+                        r = r * y!.Value;
                     }
                     break;
             }
