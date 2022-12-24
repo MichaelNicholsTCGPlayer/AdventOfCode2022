@@ -8,15 +8,51 @@ namespace Puzzles.Solutions
 
         public string Puzzle1(string[] input)
         {
-            // 296 too low
-            // 1569 too high
-            var s = new State(input);
-            return s.DoIt();
+            var init = ParseInitialBlizzards(input, out var width, out var height);
+            var s = new State(init, width, height, (1, 0), (width - 2, height - 1), 0, 400);
+            return s.DoIt().ToString();
         }
 
         public string Puzzle2(string[] input)
         {
             throw new NotImplementedException();
+        }
+
+        private Dictionary<(int x, int y), (int modX, int modY)> ParseInitialBlizzards(string[] input, out int Width, out int Height)
+        {
+            var dic = new Dictionary<(int x, int y), (int modX, int modY)>();
+
+            // Get Size (of movable spaces)
+            Width = input[0].Length;
+            Height = input.Length;
+
+            // Load Blizzard Info
+            for (int y = 1; y < input.Length - 1; y++)
+            {
+                for (int x = 1; x < input[y].Length - 1; x++)
+                {
+                    switch (input[y][x])
+                    {
+                        case '>':
+                            dic[(x, y)] = (1, 0);
+                            break;
+
+                        case '<':
+                            dic[(x, y)] = (-1, 0);
+                            break;
+
+                        case '^':
+                            dic[(x, y)] = (0, -1);
+                            break;
+
+                        case 'v':
+                            dic[(x, y)] = (0, 1);
+                            break;
+                    }
+                }
+            }
+
+            return dic;
         }
 
 
@@ -25,79 +61,46 @@ namespace Puzzles.Solutions
             private int Width;
             private int Height;
 
-            private int StartX;
-            private int EndX;
-
+            private (int x, int y) Start;
+            private (int x, int y) End;
 
             private int GlobalShortestPath = int.MaxValue;
-
 
             private Dictionary<(int x, int y), (int modX, int modY)> InitialBlizzards = new();
 
             private Dictionary<int, HashSet<(int x, int y)>> BlizzardsRounds = new();
 
-            public State(string[] input)
+            private int InitialRound;
+            private int MaxRound;
+            private int EndYModCheck;
+
+            public State(Dictionary<(int x, int y), (int modX, int modY)> initialBlizzards, int width, int height, 
+                (int x, int y) startPosition, (int x, int y) endPosition, int initialRound, int maxRound)
             {
                 // Get Size (of movable spaces)
-                Width = input[0].Length;
-                Height = input.Length;
+                Width = width;
+                Height = height;
 
-                // Find Start and End Points
-                StartX = input[0].Select((r, i) => new { R = r, I = i }).Where(r => r.R != '#').Select(r => r.I).First();
-                EndX = input[input.Length - 1].Select((r, i) => new { R = r, I = i }).Where(r => r.R != '#').Select(r => r.I).First();
+                InitialBlizzards = initialBlizzards;
 
-                // Load Blizzard Info
-                for (int y = 1; y < input.Length - 1; y++)
-                {
-                    for (int x = 1; x < input[y].Length - 1; x++)
-                    {
-                        switch (input[y][x])
-                        {
-                            case '>':
-                                InitialBlizzards[(x, y)] = (1, 0);
-                                break;
+                Start = startPosition;
+                End = endPosition;
+                InitialRound = initialRound;
+                MaxRound = maxRound;
 
-                            case '<':
-                                InitialBlizzards[(x, y)] = (-1, 0);
-                                break;
 
-                            case '^':
-                                InitialBlizzards[(x, y)] = (0, -1);
-                                break;
-
-                            case 'v':
-                                InitialBlizzards[(x, y)] = (0, 1);
-                                break;
-                        }
-                    }
-                }
+                if (Start.y < End.y)
+                    EndYModCheck = -1;
+                else
+                    EndYModCheck = 1;
             }
 
-            public string DoIt()
+            public int DoIt()
             {
-                // Build Initial Invalid Moves Data (aka the Walls)
-                var invalidMoves = new HashSet<(int x, int y)>();
-                for (int i = 0; i < Width; i++)
-                {
-                    invalidMoves.Add((i, 0));
+                Path.Push(Start);
+                var bestMovesCount = GetScoreForMove(Start, InitialRound);
 
-                    if (i != EndX)
-                        invalidMoves.Add((i, Height - 1));
-                }
-
-                for (int i = 0; i < Height; i++)
-                {
-                    invalidMoves.Add((0, i));
-                    invalidMoves.Add((Width - 1, i));
-                }
-
-                invalidMoves.Add((StartX, 1));
-
-                //var bestMovesCount = GetScoreForMove((StartX, 1), 1, invalidMoves);
-                Path.Push((StartX, 1));
-                var bestMovesCount = GetScoreForMove((StartX, 0), 0);
-
-                return bestMovesCount.ToString();
+                return bestMovesCount;
             }
 
 
@@ -106,10 +109,56 @@ namespace Puzzles.Solutions
             Stack<(int x, int y)> Path = new Stack<(int x, int y)>();
 
 
+            private IEnumerable<(int x, int y)> GetAttemptOrder((int x, int y) currentPosition)
+            {
+                List<(int x, int y)> order = new List<(int x, int y)>();
+
+                (int x, int y) upCoord = (x: currentPosition.x, y: currentPosition.y - 1);
+                (int x, int y) downCoord = (x: currentPosition.x, y: currentPosition.y + 1);
+                (int x, int y) rightCoord = (x: currentPosition.x + 1, y: currentPosition.y);
+                (int x, int y) leftCoord = (x: currentPosition.x - 1, y: currentPosition.y);
+
+                if (Start.y < End.y)
+                {
+                    if (CoordInBounds(downCoord))
+                        order.Add(downCoord);
+
+                    if (CoordInBounds(rightCoord))
+                        order.Add(rightCoord);
+
+                    order.Add(currentPosition);
+
+                    if (CoordInBounds(upCoord))
+                        order.Add(upCoord);
+
+                    if (CoordInBounds(leftCoord))
+                        order.Add(leftCoord);
+                }
+                else 
+                {
+                    if (CoordInBounds(upCoord))
+                        order.Add(upCoord);
+
+                    if (CoordInBounds(leftCoord))
+                        order.Add(leftCoord);
+
+                    order.Add(currentPosition);
+
+                    if (CoordInBounds(rightCoord))
+                        order.Add(rightCoord);
+
+                    if (CoordInBounds(downCoord))
+                        order.Add(downCoord);
+                }
+
+                return order;
+            }
+
+
             private int GetScoreForMove((int x, int y) currentPosition, int round)
             {
-                // Check to see if we made it to the end (or rather the space next to the end)
-                if (currentPosition.y == Height - 2 && currentPosition.x == EndX)
+                // Check to see if we made it to the end  (or rather 1 space away)
+                if (currentPosition.y == End.y + EndYModCheck && currentPosition.x == End.x)
                 {
                     // Update the Global Shortest (so we can short cut)
                     if (round + 1 < GlobalShortestPath)
@@ -123,14 +172,8 @@ namespace Puzzles.Solutions
                     return round + 1;
                 }
 
-                // Try to get cached value
-                if (scoreCache.TryGetValue((currentPosition.x, currentPosition.y, round), out var cacheValue))
-                {
-                    return cacheValue;
-                }
-
                 // In theory we could wait forever, so lets assume, if we get to a large enough round, then we waited too long, and should abort
-                if (round >= 1569)
+                if (round >= MaxRound)
                 {
                     return int.MaxValue;
                 }
@@ -144,87 +187,34 @@ namespace Puzzles.Solutions
                 }
 
 
-                // Calculate Possible Moves (including wait)
-                (int x, int y) upCoord = (x: currentPosition.x, y: currentPosition.y - 1);
-                (int x, int y) downCoord = (x: currentPosition.x, y: currentPosition.y + 1);
-                (int x, int y) rightCoord = (x: currentPosition.x + 1, y: currentPosition.y);
-                (int x, int y) leftCoord = (x: currentPosition.x - 1, y: currentPosition.y);
+                // Try to get cached value
+                if (scoreCache.TryGetValue((currentPosition.x, currentPosition.y, round), out var cacheValue))
+                {
+                    return cacheValue;
+                }
 
+
+                // Calculate Possible Moves (including wait)
+                var possibleMoves = GetAttemptOrder(currentPosition);
 
                 // Get the position of the blizzards this round
                 var blizzards = GetEndBlizzardsForRound(round);
 
-                var canGoUp = CoordInBounds(upCoord) && !blizzards.Contains(upCoord);
-                var canGoDown = CoordInBounds(downCoord) && !blizzards.Contains(downCoord);
-                var canGoRight = CoordInBounds(rightCoord) && !blizzards.Contains(rightCoord);
-                var canGoLeft = CoordInBounds(leftCoord) && !blizzards.Contains(leftCoord);
-
-
-                // DEBUG
-                //var p = Print(GetEndBlizzardsForRound(round - 1), currentPosition, Path);
-
-
+                // Loop over the possible Moves and calculate the shortest path
                 int shortest = int.MaxValue;
-
-                // Check Move Down
-                if (canGoDown)
+                foreach (var move in possibleMoves)
                 {
-                    Path.Push(downCoord);
-                    var score = GetScoreForMove(downCoord, round + 1);
-                    Path.Pop();
-
-                    if (score < shortest)
+                    // Check if we can move there (aka no Blizzard next turn)
+                    if (!blizzards.Contains(move))
                     {
-                        shortest = score;
-                    }
-                }
+                        Path.Push(move);
+                        var score = GetScoreForMove(move, round + 1);
+                        Path.Pop();
 
-                // Check Move Right
-                if (canGoRight)
-                {
-                    Path.Push(rightCoord);
-                    var score = GetScoreForMove(rightCoord, round + 1);
-                    Path.Pop();
-
-                    if (score < shortest)
-                    {
-                        shortest = score;
-                    }
-                }
-
-                // Just try waiting, see if conditions improve
-                if (!blizzards.Contains(currentPosition))
-                {
-                    Path.Push(currentPosition);
-                    var score = GetScoreForMove(currentPosition, round + 1);
-                    Path.Pop();
-                    if (score < shortest)
-                    {
-                        shortest = score;
-                    }
-                }
-
-                // Check Move Up
-                if (canGoUp)
-                {
-                    Path.Push(upCoord);
-                    var score = GetScoreForMove(upCoord, round + 1);
-                    Path.Pop();
-                    if (score < shortest)
-                    {
-                        shortest = score;
-                    }
-                }
-
-                // Check Move Left
-                if (canGoLeft)
-                {
-                    Path.Push(leftCoord);
-                    var score = GetScoreForMove(leftCoord, round + 1);
-                    Path.Pop();
-                    if (score < shortest)
-                    {
-                        shortest = score;
+                        if (score < shortest)
+                        {
+                            shortest = score;
+                        }
                     }
                 }
 
@@ -316,7 +306,7 @@ namespace Puzzles.Solutions
 
 
         public enum Direction
-        { 
+        {
             None = 0,
             North = 1,
             South = 2,
