@@ -9,13 +9,32 @@ namespace Puzzles.Solutions
         public string Puzzle1(string[] input)
         {
             var init = ParseInitialBlizzards(input, out var width, out var height);
-            var s = new State(init, width, height, (1, 0), (width - 2, height - 1), 0, 400);
+            var br = new Dictionary<int, HashSet<(int x, int y)>>();
+            var s = new State(init, br, width, height, (1, 0), (width - 2, height - 1), 0, 400);
             return s.DoIt().ToString();
         }
 
         public string Puzzle2(string[] input)
         {
-            throw new NotImplementedException();
+            var init = ParseInitialBlizzards(input, out var width, out var height);
+            var br = new Dictionary<int, HashSet<(int x, int y)>>();
+
+            // Go from Start to End
+            var s1 = new State(init, br, width, height, (1, 0), (width - 2, height - 1), 0, 400);
+            var s1_round = s1.DoIt();
+            s1.Dispose();
+
+            // Go from End to Start
+            var s2 = new State(init, br, width, height, (width - 2, height - 1), (1, 0), s1_round, 1500); // or do we need to start at s1_round + 1?
+            var s2_round = s2.DoIt();
+            s2.Dispose();
+
+            // Go from Start back to End
+            var s3 = new State(init, br, width, height, (1, 0), (width - 2, height - 1), s2_round, 3000); // or do we need to start at s2_round + 1?
+            var s3_round = s3.DoIt();
+            s3.Dispose();
+
+            return s3_round.ToString();
         }
 
         private Dictionary<(int x, int y), (int modX, int modY)> ParseInitialBlizzards(string[] input, out int Width, out int Height)
@@ -74,14 +93,19 @@ namespace Puzzles.Solutions
             private int MaxRound;
             private int EndYModCheck;
 
-            public State(Dictionary<(int x, int y), (int modX, int modY)> initialBlizzards, int width, int height, 
-                (int x, int y) startPosition, (int x, int y) endPosition, int initialRound, int maxRound)
+            public State(
+                Dictionary<(int x, int y), (int modX, int modY)> initialBlizzards, // this wont change
+                Dictionary<int, HashSet<(int x, int y)>> blizzardsRounds, // this wont change
+                int width, int height, // this wont change
+                (int x, int y) startPosition, (int x, int y) endPosition,
+                int initialRound, int maxRound)
             {
                 // Get Size (of movable spaces)
                 Width = width;
                 Height = height;
 
                 InitialBlizzards = initialBlizzards;
+                BlizzardsRounds = blizzardsRounds;
 
                 Start = startPosition;
                 End = endPosition;
@@ -93,6 +117,15 @@ namespace Puzzles.Solutions
                     EndYModCheck = -1;
                 else
                     EndYModCheck = 1;
+            }
+
+            public void Dispose()
+            {
+                // Clear stuff from memory
+                scoreCache = null!;
+                InitialBlizzards = null!;
+                Path = null!;
+                BlizzardsRounds = null!;
             }
 
             public int DoIt()

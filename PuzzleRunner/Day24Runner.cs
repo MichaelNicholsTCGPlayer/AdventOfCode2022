@@ -6,6 +6,6 @@ namespace PuzzleRunners
     {
         protected override string Puzzle1Solution => "314";
 
-        protected override string Puzzle2Solution => "TODO";
+        protected override string Puzzle2Solution => "896";
     }
 }
